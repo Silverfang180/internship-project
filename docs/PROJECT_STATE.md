@@ -110,7 +110,7 @@ Draft recommendation: pilot returning 1 chat/social agent-shift to Night (e.g. o
 | P1 Clean data (`src/clean.py`) | 60 min | DONE, 5 tests, hand-verified, **committed** (commit 92f2828 on master) |
 | P2 Analysis (`src/analyze.py`, `docs/analysis_notes.md`) | 75 min | DONE. Section A 17/17 PASS; day-count bug fixed; notes rewritten with numbers; close-out added Morning+Day before/after and break-even. **Not yet committed.** `docs/PROJECT_STATE.md` is untracked in git until the Phase 2 commit |
 | P3 Tool (`src/report.py`, README) | 60 min | DONE. Built, tests passing, README updated, ran for 2026-06-22 to 2026-06-28. |
-| P4 Validation (50-ticket hand-checked sample) | 40 min | NOT STARTED |
+| P4 Validation (30-ticket hand-checked sample) | 40 min | READY FOR MANUAL REVIEW. Tools built (`validate.py`, `score_validation.py`) and tested. |
 | P5 Memo, video, form, final security audit | 55 min | NOT STARTED |
 **Hours spent so far:** not recorded. The user must log real times in `logs/HOURS_LOG.md` (not yet created); include review/fix time. **Budget: 5 hours cap.** Fixes and data-corruption handling already used extra time, so keep P3 minimal.
 
@@ -157,7 +157,7 @@ Update docs/PROJECT_STATE.md to reflect the current repo and this session. Keep 
 ## 15. NEXT STEP
 1. Verify this file is the full version: `(Get-Content docs\PROJECT_STATE.md).Count` should be about 160+ and `(Select-String docs\PROJECT_STATE.md -Pattern '^## ').Count` about 17. If not, overwrite it with the latest copy.
 2. Commit Phase 2: `git add -A; git commit -m "phase 2: analysis and notes"; git status; git ls-files` (data/, output/, .venv/ must not appear).
-3. Phase 4 (user hand-checks a 50-ticket sample), Phase 5 (memo, video, form), final security audit, publish repo + Drive, submit on the portal.
+3. Phase 4 (user hand-checks a 30-ticket sample using `output/validation_blank.md` and `output/my_answers.txt`), Phase 5 (memo, video, form), final security audit, publish repo + Drive, submit on the portal.
 4. Memo must say: gap is mainly chat/social; break-even at export volume; sample-size question; 3 missing agents; the report is by creation shift not by agent.
 
 ## 16. CHANGELOG
@@ -170,3 +170,4 @@ Update docs/PROJECT_STATE.md to reflect the current repo and this session. Keep 
 - 4 Oct 2026: Antigravity appeared to replace this file with a shorter one; full version restored and updated by Claude.
 - 4 Oct 2026: Phase 3 completed; report tool built, tests passing, README updated, run successfully without PYTHONPATH.
 - 4 Oct 2026: Phase 3 fixes: Coverage gaps grouped by team/shift, inherited breaches explicitly handled in 'Resolved By' table (with Tier 2 excluded), warning fixed.
+- 4 Oct 2026: Phase 4 validation tools built (`validate.py` and `score_validation.py`). `clean.py` confirmed to use strict inequality for breach. Tests passing.
