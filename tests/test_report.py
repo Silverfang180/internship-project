@@ -112,3 +112,33 @@ def test_reconciliation_check(tmp_path):
     
     # The headline should show 21.8% breach rate (2440/11200 tickets)
     assert "2440/11200 tickets" in content, "Reconciliation check failed!"
+
+def test_tier2_exclusion(tmp_path):
+    out_file = tmp_path / "report_tier2.md"
+
+    df_tickets = pd.DataFrame({
+        'ticket_id': ['T1', 'T2'],
+        'created_at': ['2026-06-22 10:00:00+05:30', '2026-06-22 10:00:00+05:30'],
+        'created_shift_ist': ['Morning', 'Morning'],
+        'channel': ['chat', 'chat'],
+        'breach': [False, False],
+        'resolver_tier': [1, 2],
+        'resolver_shift': ['Morning', 'Morning'],
+        'assigned_team': ['Chat Frontline', 'Chat Frontline']
+    })
+
+    df_agents = pd.DataFrame({
+        'agent_id': ['A1', 'A2'],
+        'team': ['Chat Frontline', 'Chat Frontline'],
+        'shift': ['Morning', 'Morning'],
+        'from_date': ['2026-01-01', '2026-01-01'],
+        'to_date': ['2026-12-31', '2026-12-31']
+    })
+
+    run_report('2026-06-22', '2026-06-22', str(out_file), df_tickets, df_agents)
+
+    content = out_file.read_text(encoding='utf-8')
+    assert "*Excluded Tier 2 / Escalations tickets: 1*" in content
+    # Only the Tier 1 ticket should be in the table
+    assert "| Morning | Chat Frontline | 1 | 0 | 0.0% | 0 | 0.0% |" in content
+    assert "| Morning | Chat Frontline | 2 |" not in content

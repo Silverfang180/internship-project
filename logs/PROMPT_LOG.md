@@ -104,3 +104,12 @@ Note: the agent guessed these were "agents pasting transcripts." The data showed
 Problem: the agent hit a date error and "fixed" it with format="mixed" and dayfirst=True. That hid the real issue: my local tickets.csv had been altered (slash dates, 4,412,554 bytes instead of 4,440,409).
 What I did: replaced the file with the original, checked the byte size of every data file, and made the parser strict (YYYY-MM-DD HH:MM only, error with ticket IDs if not).
 Discarded: format="mixed" / dayfirst=True.
+
+## Version 10 (Phase 4 Pre-CLI Audit and Fix)
+Action:
+(Agent was directed to perform a rigorous bug hunt against the repository and fix any confirmed issues without changing business logic or documentation unnecessarily. A P1 Tier 2 bug in `report.py` was found and fixed.)
+
+Changed:
+- Fixed `report.py` to compare `resolver_tier` against integer `2` instead of string `'Tier 2'`.
+- Added `test_tier2_exclusion` to `tests/test_report.py` to prevent regression.
+- Validated that the bug fix correctly excluded 16 Tier 2 tickets (up from 12) without impacting other metrics.

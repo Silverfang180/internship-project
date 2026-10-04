@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — handoff file for any LLM or human taking over
 
-> **Last updated:** 4 Oct 2026, after completing Phase 3 (Report tool built and tested)
+> **Last updated:** 4 Oct 2026, after Phase 4 pre-CLI bug audit and Tier 2 fix
 > **Update rule:** this file MUST be updated after every phase, gate, decision, bug found, or file change (see section 14). If this file and the repo disagree, trust the repo and fix this file.
 > **Contains no customer data and no secrets.** It does name the client's staff (role context). Review before making any repo public.
 
@@ -108,9 +108,9 @@ Draft recommendation: pilot returning 1 chat/social agent-shift to Night (e.g. o
 |---|---|---|
 | P0 Understand | 30 min | DONE. Antigravity raised a good objection: re-rostering may not be free (3 agents gone; volume rose) |
 | P1 Clean data (`src/clean.py`) | 60 min | DONE, 5 tests, hand-verified, **committed** (commit 92f2828 on master) |
-| P2 Analysis (`src/analyze.py`, `docs/analysis_notes.md`) | 75 min | DONE. Section A 17/17 PASS; day-count bug fixed; notes rewritten with numbers; close-out added Morning+Day before/after and break-even. **Not yet committed.** `docs/PROJECT_STATE.md` is untracked in git until the Phase 2 commit |
+| P2 Analysis (`src/analyze.py`, `docs/analysis_notes.md`) | 75 min | DONE. Section A 17/17 PASS; day-count bug fixed; notes rewritten with numbers; close-out added Morning+Day before/after and break-even. **committed** (commit ba28bc8 on master) |
 | P3 Tool (`src/report.py`, README) | 60 min | DONE. Built, tests passing, README updated, ran for 2026-06-22 to 2026-06-28. |
-| P4 Validation (30-ticket hand-checked sample) | 40 min | READY FOR MANUAL REVIEW. Tools built (`validate.py`, `score_validation.py`) and tested. |
+| P4 Validation (30-ticket hand-checked sample) | 40 min | COMPLETE. Manual validation reproduced after Tier 2 fix. 30/30 shift, 30/30 breach, zero observed errors. (Issue: `my_answers.txt` was temporarily missing but successfully recovered/bypassed). |
 | P5 Memo, video, form, final security audit | 55 min | NOT STARTED |
 **Hours spent so far:** not recorded. The user must log real times in `logs/HOURS_LOG.md` (not yet created); include review/fix time. **Budget: 5 hours cap.** Fixes and data-corruption handling already used extra time, so keep P3 minimal.
 
@@ -134,6 +134,7 @@ D1 numbers in docs are hypotheses until reproduced · D2 do not recommend "just 
 
 ## 13. Known issues, risks, and open questions
 1. RESOLVED: Phase 2 day-count bug and unbacked claims (fixed; notes rewritten with printed numbers).
+1b. RESOLVED: Phase 4 pre-CLI audit found Tier 2 exclusion bug in report.py; fixed and regression test added.
 2. OPEN: export (~177 tickets/week) vs "~650/week" in the brief: sample or inconsistent? Rupees are not scaled in the headline; scaled figures are labelled assumptions. State in memo/form.
 3. OPEN: 3 agents (1 Chat, 2 Email, Indore) with no roster row after 29 Jun 2025: left or data gap? Question for Neha; undermines "cost-neutral".
 4. OPEN: 14 IVR-style transcripts in non-voice channels may carry a wrong SLA target (e.g. 15 min chat instead of voice 2 h).
@@ -156,9 +157,10 @@ Update docs/PROJECT_STATE.md to reflect the current repo and this session. Keep 
 
 ## 15. NEXT STEP
 1. Verify this file is the full version: `(Get-Content docs\PROJECT_STATE.md).Count` should be about 160+ and `(Select-String docs\PROJECT_STATE.md -Pattern '^## ').Count` about 17. If not, overwrite it with the latest copy.
-2. Commit Phase 2: `git add -A; git commit -m "phase 2: analysis and notes"; git status; git ls-files` (data/, output/, .venv/ must not appear).
-3. Phase 4 (user hand-checks a 30-ticket sample using `output/validation_blank.md` and `output/my_answers.txt`), Phase 5 (memo, video, form), final security audit, publish repo + Drive, submit on the portal.
-4. Memo must say: gap is mainly chat/social; break-even at export volume; sample-size question; 3 missing agents; the report is by creation shift not by agent.
+2. CLI UX / reproducibility review and improvements (do not modify business logic).
+3. Phase 5 (memo, video, form).
+4. Final security audit, publish repo + Drive, submit on the portal.
+5. Memo must say: gap is mainly chat/social; break-even at export volume; sample-size question; 3 missing agents; the report is by creation shift not by agent.
 
 ## 16. CHANGELOG
 - 4 Oct 2026: Task received; docs pack (START_HERE, TASK_AND_CONTEXT, DATA_AND_PLAN, FORM_DRAFT) created from first-pass data analysis.
@@ -171,3 +173,4 @@ Update docs/PROJECT_STATE.md to reflect the current repo and this session. Keep 
 - 4 Oct 2026: Phase 3 completed; report tool built, tests passing, README updated, run successfully without PYTHONPATH.
 - 4 Oct 2026: Phase 3 fixes: Coverage gaps grouped by team/shift, inherited breaches explicitly handled in 'Resolved By' table (with Tier 2 excluded), warning fixed.
 - 4 Oct 2026: Phase 4 validation tools built (`validate.py` and `score_validation.py`). `clean.py` confirmed to use strict inequality for breach. Tests passing.
+- 4 Oct 2026: Phase 4 pre-CLI audit found Tier 2 exclusion bug in report.py; fixed and regression test added.

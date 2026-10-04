@@ -155,7 +155,7 @@ def run_report(start_date, end_date, out_path, df_tickets=None, df_agents=None):
     report_lines.append("Breaches counted against a shift include tickets that arrived while no one was on shift.")
     
     if curr_tickets > 0:
-        is_tier2 = (df_curr['resolver_tier'] == 'Tier 2') | (df_curr['assigned_team'] == 'Escalations & Warranty')
+        is_tier2 = (df_curr['resolver_tier'] == 2) | (df_curr['assigned_team'] == 'Escalations & Warranty')
         tier2_count = df_curr[is_tier2]['ticket_id'].count()
         
         df_t1 = df_curr[~is_tier2].copy()
