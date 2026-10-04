@@ -52,3 +52,55 @@ I disagree with the assumption in section 3 of `02_DATA_AND_PLAN.md` that revers
 What I changed or noticed:
 - It disagreed with my docs about re-rostering (see DECISIONS D2). I agreed.
 - It treated my preliminary numbers as facts. I corrected that.
+
+## Version 2 (Phase 1): build the cleaning script
+Prompt: "
+Good plan, and I agree with your point 5. Treat all numbers in docs/02_DATA_AND_PLAN.md as hypotheses to reproduce, not facts.
+
+Phase 1. Create src/clean.py (put constants in src/config.py). It reads /data and writes output/clean_tickets.csv.
+Requirements:
+- Convert UTC timestamps to IST (UTC+5:30).
+- Remove duplicate ticket_ids, keeping the helpdesk row. Write this rule in docs/DECISIONS.md.
+- Convert legacy CSAT 0 to blank.
+- Flag failed IVR transcripts. Write your detection rule in docs/DECISIONS.md.
+- Join each ticket to the roster row valid on created_at.
+- Add columns: created_shift_ist, resolver_shift, resolver_tier, target_minutes, response_minutes, breach, credit_inr (350 per breach).
+- Print counts: rows in, duplicates removed, CSAT zeros converted, IVR flagged, roster matches, unmatched.
+Create a .venv, a pinned requirements.txt, and tests/test_clean.py covering: timezone conversion near the shift boundaries (05:30, 13:30, 21:30 IST), the 30 Jun 2025 roster boundary, duplicate handling, and CSAT zero handling.
+Do not print customer names, customer IDs or message text. Run the tests, show the output, then stop."
+
+
+Result: Antigravity built src/clean.py with tests. Counts matched my own checks (11,816 rows in, 616 duplicates removed, 11,200 roster matches).
+Problems I found when I reviewed it:
+- It claimed the output had "no customer PI" but was exporting the full table, including customer ID and message text.
+- Only 2 tests, not the boundary tests I asked for.
+- IVR rule flagged 14 rows, but the client said about 40.
+
+## Version 3 (Phase 1 fixes)
+Prompt:"
+Phase 1 fixes. Do these, then stop.
+1) Reduce output/clean_tickets.csv to the columns needed for analysis: ticket_id, created_at (IST), first_response_at (IST), resolved_at (IST), status, channel, category, priority, assigned_team, transfers, csat_score, source_system, agent_id, resolver_shift, resolver_tier, created_shift_ist, target_minutes, response_minutes, breach, credit_inr, ivr_failed. Remove customer_id, order_id, customer_message, agent_notes and refund fields from the output. Confirm the new column list by printing it.
+2) Write separate tests: shift assignment at 05:59, 06:00, 13:59, 14:00, 21:59 and 22:00 IST; the roster join for a ticket on 29 Jun 2025 and on 30 Jun 2025 for agent A3002; duplicate handling (helpdesk row kept); CSAT 0 becomes blank for legacy rows only. Run all tests and show the output.
+3) IVR: Sameer's email says about 40 failed transcripts but you flagged 14. Search ALL voice rows (not only those starting with "[IVR transcript]") for empty, one-character, punctuation-only or garbled messages. Print counts per rule, not the message text. Record in docs/DECISIONS.md what you found and that it differs from the ~40 stated. Do not force the number to 40.
+4) Verify that for the 616 duplicate pairs, every column except source_system and csat_score is identical between the two rows; print how many pairs differ and in which columns.
+5) Add to README.md how to run: python -m src.clean (not python src/clean.py)."
+
+
+Changed: output columns reduced to derived fields only; 4 tests; checked that all 616 duplicate pairs are identical; README run command fixed.
+Discarded: the voice-only IVR rule. It flagged only 2 rows and missed 14 failed transcripts sitting in chat/email/social.
+
+## Version 4 (IVR correction)
+Prompt: "
+IVR correction. Do not change any breach logic.
+1) Set ivr_failed = True for any ticket in ANY channel whose customer_message contains [inaudible] or [line dropped], plus the 2 voice rows that are only punctuation (".", "??"). Print counts by channel only, never the message text.
+2) Update docs/DECISIONS.md: the total flagged, that Sameer's email says about 40 and we found fewer, that 14 IVR-style transcripts sit in non-voice channels (so their SLA target may be wrong), and that this was left unchanged.
+3) Rerun the tests and src.clean and show the counts. Then stop."
+
+
+Changed: ivr_failed now covers all channels. Total 16 flagged, still fewer than the ~40 in the client's email. I documented the gap and did not force the number.
+Note: the agent guessed these were "agents pasting transcripts." The data showed they are IVR-prefixed messages in non-voice channels. I corrected that.
+
+## Version 5 (strict date parsing)
+Problem: the agent hit a date error and "fixed" it with format="mixed" and dayfirst=True. That hid the real issue: my local tickets.csv had been altered (slash dates, 4,412,554 bytes instead of 4,440,409).
+What I did: replaced the file with the original, checked the byte size of every data file, and made the parser strict (YYYY-MM-DD HH:MM only, error with ticket IDs if not).
+Discarded: format="mixed" / dayfirst=True.
