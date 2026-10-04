@@ -66,11 +66,21 @@ def test_scorer_handles_formatting(tmp_path, monkeypatch, capsys):
         else:
             lines.append(f"{tid},{t_shift.lower()},{t_breach}\r\n") # test lowercase shift
             
-    # Write with BOM
-    my_answers_path = 'output/my_answers.txt'
+    # Isolate test artifacts using tmp_path
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+
+    # Copy validation_key.csv to the isolated environment
+    key_df.to_csv(out_dir / "validation_key.csv", index=False)
+
+    # Write the mock my_answers.txt to the isolated environment
+    my_answers_path = out_dir / "my_answers.txt"
     with open(my_answers_path, 'w', encoding='utf-8-sig') as f:
         f.writelines(lines)
         
+    # Change working directory so score_validation reads from the isolated environment
+    monkeypatch.chdir(tmp_path)
+
     # Run scorer
     score_validation()
     
@@ -80,9 +90,3 @@ def test_scorer_handles_formatting(tmp_path, monkeypatch, capsys):
     # Assert
     assert "Sample size: 30" in out
     assert "Shift mismatch:" in out, "Did not flag the shift mismatch correctly."
-    
-    # Clean up
-    if os.path.exists('docs/validation_results.md'):
-        os.remove('docs/validation_results.md')
-    if os.path.exists(my_answers_path):
-        os.remove(my_answers_path)
