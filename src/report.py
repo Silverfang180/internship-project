@@ -3,18 +3,29 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-import getpass
 
 from src.cli_input import getpass_asterisk
+from src.config import NIGHT_FINDING_MIN_BREACH_PCT, NIGHT_FINDING_RATE_MULTIPLIER
+
 def escape_md(val):
     if isinstance(val, str) and val.startswith(('=', '+', '-', '@')):
         return "'" + val
     return val
 
+def build_ai_metrics(start_date, end_date, curr_tickets, curr_breaches, curr_rate, curr_credits, night_metrics):
+    return {
+        "reporting_period": f"{start_date} to {end_date}",
+        "current_period_tickets": int(curr_tickets),
+        "sla_breaches": int(curr_breaches),
+        "breach_rate": f"{curr_rate:.1f}%",
+        "night_specific_metrics": night_metrics
+    }
+
 def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=None, **kwargs):
     input_csv = kwargs.get('input_csv', 'output/clean_tickets.csv')
     is_interactive = kwargs.get('is_interactive', False)
     api_key = kwargs.get('api_key')
+    use_ai = kwargs.get('use_ai', False)
 
     if df_tickets is None:
         if not os.path.exists(input_csv):
@@ -27,14 +38,21 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
     df['created_at_ist'] = pd.to_datetime(df['created_at'], utc=True).dt.tz_convert('Asia/Kolkata')
     df['created_date'] = df['created_at_ist'].dt.date
 
-    start_dt = pd.to_datetime(start_date).date()
-    end_dt = pd.to_datetime(end_date).date()
+    try:
+        start_dt = pd.to_datetime(start_date).date()
+        end_dt = pd.to_datetime(end_date).date()
+    except Exception:
+        print("Error: Invalid date format. Please use YYYY-MM-DD.")
+        sys.exit(2)
+
+    if start_dt > end_dt:
+        print("Error: Start date cannot be after end date.")
+        sys.exit(2)
 
     period_days = (end_dt - start_dt).days + 1
     prev_end_dt = start_dt - pd.Timedelta(days=1)
     prev_start_dt = start_dt - pd.Timedelta(days=period_days)
 
-    # 1. Headline
     df_curr = df[(df['created_date'] >= start_dt) & (df['created_date'] <= end_dt)]
     df_prev = df[(df['created_date'] >= prev_start_dt) & (df['created_date'] <= prev_end_dt)]
 
@@ -48,153 +66,6 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
     prev_rate = prev_breaches / prev_tickets * 100 if prev_tickets > 0 else 0
     prev_credits = prev_breaches * 350
 
-    # Collect specific metrics for AI to prevent hallucination
-    night_metrics = {}
-    if curr_tickets > 0:
-        agg2 = df_curr.groupby(['created_shift_ist', 'channel']).agg(
-            Tickets=('ticket_id', 'count'),
-            Breaches=('breach', 'sum')
-        ).reset_index()
-
-        for _, r in agg2.iterrows():
-            if r['created_shift_ist'] == 'Night':
-                rate = (r['Breaches'] / r['Tickets'] * 100) if r['Tickets'] > 0 else 0
-                night_metrics[f"Night {r['channel'].capitalize()}"] = f"{r['Breaches']}/{r['Tickets']} breaches ({rate:.1f}%)"
-
-    use_ai = kwargs.get('use_ai', False)
-
-    if is_interactive:
-        report_lines = []
-        start_fmt = start_dt.strftime('%d %b %Y').lstrip('0')
-        end_fmt = end_dt.strftime('%d %b %Y').lstrip('0')
-
-        report_lines.append("────────────────────────────────────────────────────────────")
-        report_lines.append("  REPORT")
-        report_lines.append("────────────────────────────────────────────────────────────\n")
-        report_lines.append(f"  {'Period':<16} {start_fmt} → {end_fmt}")
-        report_lines.append(f"  {'Tickets':<16} {curr_tickets}")
-        report_lines.append(f"  {'SLA breaches':<16} {curr_breaches}")
-        report_lines.append(f"  {'Breach rate':<16} {curr_rate:.1f}%")
-        report_lines.append(f"  {'Credit exposure':<16} ₹{curr_credits:,.0f}\n")
-
-        report_lines.append("  ┌─ TOP SIGNAL ──────────────────────────────────────────┐")
-        report_lines.append("  │ Night-created tickets have the highest concentration  │")
-        report_lines.append("  │ of breaches, especially Chat and Email.               │")
-        report_lines.append("  └───────────────────────────────────────────────────────┘\n")
-
-        if use_ai:
-            try:
-                from src.ai_insight import generate_insight
-                metrics_dict = {
-                    "reporting_period": f"{start_date} to {end_date}",
-                    "current_period_tickets": int(curr_tickets),
-                    "export_average_weekly_tickets": 177,
-                    "brief_quoted_weekly_tickets": 650,
-                    "sla_breaches": int(curr_breaches),
-                    "breach_rate": f"{curr_rate:.1f}%",
-                    "night_specific_metrics": night_metrics
-                }
-                insight = generate_insight(metrics_dict, api_key=api_key)
-
-                # Only print the header if we haven't already in the prompt, or if we got an insight
-                # Actually, the interactive prompt already printed "AI Manager Commentary" if no key was present.
-                # To avoid duplicates, we handle the layout here:
-                if kwargs.get('header_already_printed') and insight is None:
-                    report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
-                    report_lines.append("────────────────────────────────────────────────────────────")
-                else:
-                    if not kwargs.get('header_already_printed'):
-                        report_lines.append("────────────────────────────────────────────────────────────")
-                        report_lines.append("  AI Manager Commentary")
-                        report_lines.append("────────────────────────────────────────────────────────────\n")
-
-                    if insight:
-                        report_lines.append("  What happened")
-
-                        # Small helper to wrap text to line width if desired, but we can just print it
-                        def wrap_text(text, indent="  "):
-                            import textwrap
-                            return textwrap.fill(text, width=58, initial_indent=indent, subsequent_indent=indent)
-
-                        report_lines.append(wrap_text(insight.get('what_happened', '')))
-
-                        report_lines.append("\n  Numerical evidence computed by Python")
-                        for k, v in night_metrics.items():
-                            report_lines.append(f"  • {k:<15} {v}")
-
-                        report_lines.append("\n  What this suggests")
-                        report_lines.append(wrap_text(insight.get('interpretation', '')))
-                        report_lines.append("\n  Recommended test")
-                        report_lines.append(wrap_text(insight.get('recommended_test', '')))
-                        report_lines.append("\n  Caveat")
-                        report_lines.append(wrap_text(insight.get('caveat', '')))
-
-                        report_lines.append("\n────────────────────────────────────────────────────────────")
-                        report_lines.append("  AI insight: enabled")
-                        report_lines.append("────────────────────────────────────────────────────────────")
-                    else:
-                        if not kwargs.get('header_already_printed'):
-                            report_lines.append("────────────────────────────────────────────────────────────")
-                            report_lines.append("  AI Manager Commentary")
-                            report_lines.append("────────────────────────────────────────────────────────────\n")
-                        report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
-                        report_lines.append("────────────────────────────────────────────────────────────")
-            except ImportError:
-                if not kwargs.get('header_already_printed'):
-                    report_lines.append("────────────────────────────────────────────────────────────")
-                    report_lines.append("  AI Manager Commentary")
-                    report_lines.append("────────────────────────────────────────────────────────────\n")
-                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
-                report_lines.append("────────────────────────────────────────────────────────────")
-        else:
-            if kwargs.get('header_already_printed'):
-                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
-                report_lines.append("────────────────────────────────────────────────────────────")
-            else:
-                report_lines.append("────────────────────────────────────────────────────────────")
-                report_lines.append("  AI Manager Commentary")
-                report_lines.append("────────────────────────────────────────────────────────────\n")
-                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
-                report_lines.append("────────────────────────────────────────────────────────────")
-
-        print('\n'.join(report_lines))
-        return
-
-    # Standard Markdown Report Output
-    report_lines = []
-    report_lines.append("# VIREO AUDIO — SUPPORT SLA INTELLIGENCE")
-    report_lines.append(f"**Reporting Period:** {start_date} to {end_date}")
-    report_lines.append(f"Source: {input_csv}")
-    report_lines.append("")
-    report_lines.append("## 1. Headline Summary")
-    report_lines.append(f"**Current Period:** {curr_rate:.1f}% breach rate ({curr_breaches}/{curr_tickets} tickets), Rs {curr_credits} credits.")
-
-    if prev_tickets > 0:
-        report_lines.append(f"**Previous Period ({prev_start_dt} to {prev_end_dt}):** {prev_rate:.1f}% breach rate ({prev_breaches}/{prev_tickets} tickets), Rs {prev_credits} credits.")
-    else:
-        report_lines.append("**Previous Period:** No data available for comparison.")
-
-    # 2. Breaches by ticket-creation shift (IST) and channel
-    report_lines.append("\n## 2. Breaches by Creation Shift and Channel")
-    if curr_tickets > 0:
-        agg2 = df_curr.groupby(['created_shift_ist', 'channel']).agg(
-            Tickets=('ticket_id', 'count'),
-            Breaches=('breach', 'sum')
-        ).reset_index()
-        agg2['Breach Rate'] = (agg2['Breaches'] / agg2['Tickets'] * 100).round(1).astype(str) + '%'
-
-        report_lines.append("| Shift | Channel | Tickets | Breaches | Rate |")
-        report_lines.append("|---|---|---|---|---|")
-        for _, r in agg2.iterrows():
-            shift = escape_md(str(r['created_shift_ist']))
-            ch = escape_md(str(r['channel']))
-            report_lines.append(f"| {shift} | {ch} | {r['Tickets']} | {r['Breaches']} | {r['Breach Rate']} |")
-    else:
-        report_lines.append("No tickets in this period.")
-
-    # 3. Coverage-gap flag
-    report_lines.append("\n## 3. Coverage Gaps")
-    report_lines.append("*Note: Voice callbacks run 08:00-22:00 only, so Night gaps for Voice are expected.*")
     ch_to_team = {
         'chat': 'Chat Frontline',
         'social': 'Chat Frontline',
@@ -243,6 +114,166 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
                     'Gap Rate': f"{br_rate:.1f}%"
                 })
 
+    night_metrics = {}
+    night_finding_applies = False
+    top_night_channels = []
+
+    if curr_tickets > 0:
+        agg2 = df_curr.groupby(['created_shift_ist', 'channel']).agg(
+            Tickets=('ticket_id', 'count'),
+            Breaches=('breach', 'sum')
+        ).reset_index()
+
+        night_breaches = 0
+        night_tickets = 0
+        md_breaches = 0
+        md_tickets = 0
+        night_channels = []
+
+        for _, r in agg2.iterrows():
+            if r['created_shift_ist'] == 'Night':
+                rate = (r['Breaches'] / r['Tickets'] * 100) if r['Tickets'] > 0 else 0
+                night_metrics[f"Night {r['channel'].capitalize()}"] = f"{r['Breaches']}/{r['Tickets']} breaches ({rate:.1f}%)"
+                night_breaches += r['Breaches']
+                night_tickets += r['Tickets']
+                night_channels.append((r['channel'].capitalize(), r['Breaches']))
+            else:
+                md_breaches += r['Breaches']
+                md_tickets += r['Tickets']
+
+        night_rate = night_breaches / night_tickets if night_tickets > 0 else 0
+        md_rate = md_breaches / md_tickets if md_tickets > 0 else 0
+
+        has_zero_staff_gap = any(g['Gap Tickets'] > 0 for g in gap_summary)
+        is_majority_breaches = (night_breaches / curr_breaches) >= NIGHT_FINDING_MIN_BREACH_PCT if curr_breaches > 0 else False
+        is_2x_rate = night_rate >= (md_rate * NIGHT_FINDING_RATE_MULTIPLIER)
+
+        if has_zero_staff_gap and is_majority_breaches and is_2x_rate:
+            night_finding_applies = True
+            night_channels.sort(key=lambda x: x[1], reverse=True)
+            top_channels_list = [c[0] for c in night_channels if c[1] > 0]
+            if len(top_channels_list) > 1:
+                top_night_channels = ", ".join(top_channels_list[:-1]) + " and " + top_channels_list[-1]
+            elif len(top_channels_list) == 1:
+                top_night_channels = top_channels_list[0]
+            else:
+                top_night_channels = "various channels"
+
+    if is_interactive:
+        report_lines = []
+        start_fmt = start_dt.strftime('%d %b %Y').lstrip('0')
+        end_fmt = end_dt.strftime('%d %b %Y').lstrip('0')
+
+        report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+        report_lines.append("  REPORT")
+        report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+        report_lines.append(f"  {'Period':<16} {start_fmt} â†’ {end_fmt}")
+        report_lines.append(f"  {'Tickets':<16} {curr_tickets}")
+        report_lines.append(f"  {'SLA breaches':<16} {curr_breaches}")
+        report_lines.append(f"  {'Breach rate':<16} {curr_rate:.1f}%")
+        report_lines.append(f"  {'Credit exposure':<16} â‚¹{curr_credits:,.0f}\n")
+
+        report_lines.append("  â”Œâ”€ TOP SIGNAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”")
+        if night_finding_applies:
+            import textwrap
+            msg = f"The largest concentration of SLA breaches is in Night-created tickets, particularly {top_night_channels}, coinciding with the absence of overnight frontline coverage."
+            wrapped = textwrap.wrap(msg, width=51)
+            for line in wrapped:
+                report_lines.append(f"  â”‚ {line:<53} â”‚")
+        else:
+            report_lines.append("  â”‚ No single shift or channel stands out this period.    â”‚")
+        report_lines.append("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜\n")
+
+        if use_ai:
+            try:
+                from src.ai_insight import generate_insight
+                metrics_dict = build_ai_metrics(start_date, end_date, curr_tickets, curr_breaches, curr_rate, curr_credits, night_metrics)
+                insight = generate_insight(metrics_dict, api_key=api_key)
+
+                if not kwargs.get('header_already_printed'):
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                    report_lines.append("  AI Manager Commentary")
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+
+                if insight == "WITHHELD":
+                    report_lines.append("  AI commentary withheld by safety check; the report above is unaffected.")
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                elif insight:
+                    report_lines.append("  What happened")
+                    import textwrap
+                    report_lines.append(textwrap.fill(insight.get('what_happened', ''), width=58, initial_indent="  ", subsequent_indent="  "))
+
+                    report_lines.append("\n  Numerical evidence computed by Python")
+                    for k, v in night_metrics.items():
+                        report_lines.append(f"  â€¢ {k:<15} {v}")
+
+                    report_lines.append("\n  What this suggests")
+                    report_lines.append(textwrap.fill(insight.get('interpretation', ''), width=58, initial_indent="  ", subsequent_indent="  "))
+                    report_lines.append("\n  Recommended test")
+                    report_lines.append(textwrap.fill(insight.get('recommended_test', ''), width=58, initial_indent="  ", subsequent_indent="  "))
+                    report_lines.append("\n  Caveat")
+                    report_lines.append(textwrap.fill(insight.get('caveat', ''), width=58, initial_indent="  ", subsequent_indent="  "))
+
+                    report_lines.append("\nâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                    report_lines.append("  AI insight: enabled")
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                else:
+                    report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+            except ImportError:
+                if not kwargs.get('header_already_printed'):
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                    report_lines.append("  AI Manager Commentary")
+                    report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
+                report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+        else:
+            if kwargs.get('header_already_printed'):
+                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
+                report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+            else:
+                report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+                report_lines.append("  AI Manager Commentary")
+                report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+                report_lines.append("  AI insight unavailable; deterministic report generated successfully.")
+                report_lines.append("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+
+        print('\n'.join(report_lines))
+        return
+
+    report_lines = []
+    report_lines.append("# VIREO AUDIO â€” SUPPORT SLA INTELLIGENCE")
+    report_lines.append(f"**Reporting Period:** {start_date} to {end_date}")
+    report_lines.append(f"Source: {input_csv}")
+    report_lines.append("")
+    report_lines.append("## 1. Headline Summary")
+    report_lines.append(f"**Current Period:** {curr_rate:.1f}% breach rate ({curr_breaches}/{curr_tickets} tickets), Rs {curr_credits} credits.")
+
+    if prev_tickets > 0:
+        report_lines.append(f"**Previous Period ({prev_start_dt} to {prev_end_dt}):** {prev_rate:.1f}% breach rate ({prev_breaches}/{prev_tickets} tickets), Rs {prev_credits} credits.")
+    else:
+        report_lines.append("**Previous Period:** No data available for comparison.")
+
+    report_lines.append("\n## 2. Breaches by Creation Shift and Channel")
+    if curr_tickets > 0:
+        agg2 = df_curr.groupby(['created_shift_ist', 'channel']).agg(
+            Tickets=('ticket_id', 'count'),
+            Breaches=('breach', 'sum')
+        ).reset_index()
+        agg2['Breach Rate'] = (agg2['Breaches'] / agg2['Tickets'] * 100).round(1).astype(str) + '%'
+
+        report_lines.append("| Shift | Channel | Tickets | Breaches | Rate |")
+        report_lines.append("|---|---|---|---|---|")
+        for _, r in agg2.iterrows():
+            shift = escape_md(str(r['created_shift_ist']))
+            ch = escape_md(str(r['channel']))
+            report_lines.append(f"| {shift} | {ch} | {r['Tickets']} | {r['Breaches']} | {r['Breach Rate']} |")
+    else:
+        report_lines.append("No tickets in this period.")
+
+    report_lines.append("\n## 3. Coverage Gaps")
+    report_lines.append("*Note: Voice callbacks run 08:00-22:00 only, so Night gaps for Voice are expected.*")
+
     if gap_summary:
         report_lines.append("| Team | Shift | Zero Staff Days | Gap Tickets | Gap Breaches | Gap Rate |")
         report_lines.append("|---|---|---|---|---|---|")
@@ -251,11 +282,9 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
     else:
         report_lines.append("No coverage gaps found with created tickets.")
 
-    # 4. Weekly trend table (Week starts on Monday)
     report_lines.append("\n## 4. Weekly Trend")
     if curr_tickets > 0:
         df_curr = df_curr.copy()
-        # dt.to_period('W-SUN') means week ending on Sunday, starting on Monday.
         df_curr['week_start'] = df_curr['created_at_ist'].dt.tz_localize(None).dt.to_period('W-SUN').dt.start_time.dt.date
         agg4 = df_curr.groupby('week_start').agg(
             Tickets=('ticket_id', 'count'),
@@ -271,7 +300,6 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
     else:
         report_lines.append("No tickets in this period.")
 
-    # 5. Resolved by
     report_lines.append("\n## 5. Resolved By (Shift and Team)")
     report_lines.append("*Note: The resolving agent is not necessarily who should have responded first. Tier 2 is excluded.*")
     report_lines.append("Breaches counted against a shift include tickets that arrived while no one was on shift.")
@@ -293,7 +321,6 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
 
         agg5['Breach Rate'] = (agg5['Breaches'] / agg5['Tickets'] * 100).round(1).astype(str) + '%'
 
-        # Calculate rate excluding night created tickets
         excl_night_tickets = agg5['Tickets'] - agg5['NightTickets']
         excl_night_breaches = agg5['Breaches'] - agg5['InheritedBreaches']
         agg5['ExclNightRate'] = np.where(excl_night_tickets > 0, (excl_night_breaches / excl_night_tickets * 100).round(1).astype(str) + '%', 'N/A')
@@ -307,27 +334,22 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
 
         report_lines.append(f"\n*Excluded Tier 2 / Escalations tickets: {tier2_count}*")
 
-    # 6. Key Findings and Caveats
     report_lines.append("\n## Key Findings & Business Implication")
-    report_lines.append("- **Key Finding:** The largest concentration of SLA breaches is in tickets created during the Night shift, coinciding with the absence of overnight frontline coverage.")
-    report_lines.append("- **Business Implication:** Addressing Night coverage gaps directly mitigates the highest concentration of SLA penalties.")
+    if night_finding_applies:
+        report_lines.append(f"- **Key Finding:** The largest concentration of SLA breaches is in Night-created tickets, particularly {top_night_channels}, coinciding with the absence of overnight frontline coverage.")
+        report_lines.append("- **Business Implication:** Addressing Night coverage gaps should reduce credit exposure if the pattern holds; confirm with a pilot.")
+    else:
+        report_lines.append("- **Key Finding:** No single shift or channel stands out this period.")
 
     if use_ai:
         try:
             from src.ai_insight import generate_insight
-            metrics_dict = {
-                "reporting_period": f"{start_date} to {end_date}",
-                "current_period_tickets": int(curr_tickets),
-                "export_average_weekly_tickets": 177,
-                "brief_quoted_weekly_tickets": 650,
-                "sla_breaches": int(curr_breaches),
-                "breach_rate": f"{curr_rate:.1f}%",
-                "credit_exposure": f"Rs {curr_credits}",
-                "night_specific_metrics": night_metrics
-            }
+            metrics_dict = build_ai_metrics(start_date, end_date, curr_tickets, curr_breaches, curr_rate, curr_credits, night_metrics)
             insight = generate_insight(metrics_dict, api_key=api_key)
             report_lines.append("\n## AI Manager Commentary")
-            if insight:
+            if insight == "WITHHELD":
+                report_lines.append("*AI commentary withheld by safety check; the report above is unaffected.*")
+            elif insight:
                 report_lines.append(f"- **What Happened:** {insight.get('what_happened', '')}")
                 report_lines.append(f"- **Numerical evidence computed by Python:**")
                 for k, v in night_metrics.items():
@@ -345,6 +367,7 @@ def run_report(start_date, end_date, out_path=None, df_tickets=None, df_agents=N
     report_lines.append("- The export has about 177 tickets a week vs about 650 quoted.")
     report_lines.append("- 14 IVR-style transcripts in non-voice channels may have the wrong target.")
     report_lines.append("- 3 agents have no later roster row.")
+    report_lines.append("- No queue or utilization data was provided, so causation cannot be confirmed.")
 
     if out_path:
         out_dir = os.path.dirname(out_path)
@@ -383,10 +406,10 @@ if __name__ == "__main__":
     is_interactive = args.interactive
 
     if is_interactive:
-        print("╔══════════════════════════════════════════════════════════╗")
-        print("║              VIREO AUDIO                                 ║")
-        print("║          SUPPORT SLA INTELLIGENCE                        ║")
-        print("╚══════════════════════════════════════════════════════════╝\n")
+        print("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—")
+        print("â•‘              VIREO AUDIO                                 â•‘")
+        print("â•‘          SUPPORT SLA INTELLIGENCE                        â•‘")
+        print("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n")
         print("  What would you like to analyze?\n")
         print("    [1] Latest available week")
         print("    [2] Choose a date range")
@@ -413,27 +436,36 @@ if __name__ == "__main__":
 
         print()
         args.header_already_printed = False
-        if not os.environ.get("GEMINI_API_KEY"):
-            print("────────────────────────────────────────────────────────────")
-            print("  AI Manager Commentary")
-            print("────────────────────────────────────────────────────────────\n")
-            print("  Gemini API key not configured.\n")
-            print("  Enter a Gemini API key to enable live AI insight,")
-            print("  or press Enter to continue without AI.\n")
-            api_key = getpass_asterisk("  API key: ")
-            print("────────────────────────────────────────────────────────────\n")
-            args.header_already_printed = True
+        print("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+        print("  AI Manager Commentary")
+        print("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
 
-            if api_key.strip():
-                args.api_key = api_key.strip()
-                args.use_ai = True
+        opt_in = input("  Enable AI insight? (y/n): ").strip().lower()
+        if opt_in == 'y':
+            if not os.environ.get("GEMINI_API_KEY"):
+                print("  Gemini API key not configured.\n")
+                print("  Enter a Gemini API key to enable live AI insight,")
+                print("  or press Enter to continue without AI.\n")
+                api_key = getpass_asterisk("  API key: ")
+                print("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+                args.header_already_printed = True
+
+                if api_key.strip():
+                    args.api_key = api_key.strip()
+                    args.use_ai = True
+                else:
+                    args.api_key = None
+                    args.use_ai = False
             else:
                 args.api_key = None
-                args.use_ai = False
+                args.use_ai = True
+                print("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+                args.header_already_printed = True
         else:
             args.api_key = None
-            args.use_ai = True
-            print()
+            args.use_ai = False
+            print("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n")
+            args.header_already_printed = True
 
     else:
         if not args.start or not args.end:

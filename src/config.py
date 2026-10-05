@@ -12,3 +12,6 @@ SHIFTS = [
     ('Day', 14, 22),
     ('Night', 22, 6) # Night spans across midnight (22 to 6)
 ]
+
+NIGHT_FINDING_MIN_BREACH_PCT = 0.50
+NIGHT_FINDING_RATE_MULTIPLIER = 2.0

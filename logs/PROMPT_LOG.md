@@ -105,7 +105,7 @@ Problem: the agent hit a date error and "fixed" it with format="mixed" and dayfi
 What I did: replaced the file with the original, checked the byte size of every data file, and made the parser strict (YYYY-MM-DD HH:MM only, error with ticket IDs if not).
 Discarded: format="mixed" / dayfirst=True.
 
-## Version 10 (Phase 4 Pre-CLI Audit and Fix)
+## Version 6 (Phase 4 Pre-CLI Audit and Fix)
 Action:
 (Agent was directed to perform a rigorous bug hunt against the repository and fix any confirmed issues without changing business logic or documentation unnecessarily. A P1 Tier 2 bug in `report.py` was found and fixed.)
 
