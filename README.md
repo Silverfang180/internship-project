@@ -62,13 +62,30 @@ pip install -r requirements.txt
 source .venv/bin/activate
 ```
 
-## 8. Run the Data Cleaning Step
+## 8. CLI Shortcuts
+After installation and activating the virtual environment, the project provides the `sla` command for the most common operations.
+
+| Command        | Purpose                                      |
+| -------------- | -------------------------------------------- |
+| `sla report`   | Run the interactive manager report (default) |
+| `sla clean`    | Run the data cleaning pipeline               |
+| `sla test`     | Run the pytest suite                         |
+| `sla validate` | Generate the validation benchmark            |
+| `sla score`    | Score validation answers                     |
+
+```text
+sla
+```
+
+Running `sla` without a subcommand displays the available shortcuts.
+
+## 9. Run the Data Cleaning Step
 ```bash
 python -m src.clean
 ```
 This step cleans the raw data, applies strict date parsing, determines ticket creation shifts, and calculates SLA breaches based on predefined channel targets.
 
-## 9. Run the Deterministic Report
+## 10. Run the Deterministic Report
 ```bash
 python -m src.report --start 2026-06-22 --end 2026-06-28
 ```
@@ -79,7 +96,7 @@ To save the report as Markdown:
 python -m src.report --start 2026-06-22 --end 2026-06-28 --out output/report.md
 ```
 
-## 10. Interactive Manager Mode
+## 11. Interactive Manager Mode
 ```bash
 python -m src.report --interactive
 ```
@@ -91,7 +108,7 @@ This allows the user to:
 
 The deterministic analysis does NOT require an API key.
 
-## 11. Optional Gemini AI
+## 12. Optional Gemini AI
 Gemini is optional. The deterministic report works without it. Users need their own Gemini API key for live AI commentary. The key can be supplied through `.env` or interactively. The application does not intentionally commit/store API keys in Git. Raw ticket/customer records are not sent to the model. Only aggregate/summary metrics are passed for qualitative commentary. Python remains authoritative for numerical results. AI output is constrained to prevent it from inventing numerical evidence. If the API key is absent or the request fails, the application falls back to the deterministic report.
 
 **Windows PowerShell:**
@@ -106,7 +123,7 @@ export GEMINI_API_KEY="your_api_key_here"
 
 `.env` is ignored by Git and users must never commit their API key.
 
-## 12. Output / Important Files
+## 13. Output / Important Files
 | Path | Description |
 |---|---|
 | `src/` | application code |
@@ -117,12 +134,12 @@ export GEMINI_API_KEY="your_api_key_here"
 | `verification_report.md` | final engineering verification notes |
 | `requirements.txt` | Python dependencies |
 
-## 13. Client Memo
+## 14. Client Memo
 The client-facing memo is available at: `docs/memo-neha-kulkarni.md`
 
 This is the concise business-facing summary and should be read before diving into the technical implementation.
 
-## 14. Validation / Testing
+## 15. Validation / Testing
 * Manual sample: 30 tickets.
 * Correct shift: 30/30.
 * Correct SLA breach classification: 30/30.
@@ -131,7 +148,7 @@ This is the concise business-facing summary and should be read before diving int
 
 The 30-ticket manual sample does NOT prove zero errors across the entire dataset.
 
-## 15. Known Limitations
+## 16. Known Limitations
 * Data volume mismatch: approximately 177 tickets/week vs approximately 650 in the brief.
 * Three agents missing roster records after June 29, 2025.
 * 14 IVR-style transcripts in non-voice channels may have incorrect SLA targets in the source data.
@@ -141,7 +158,7 @@ The 30-ticket manual sample does NOT prove zero errors across the entire dataset
 * The tool is local and is not presented as a production deployment.
 * Tier 2 is excluded from Tier 1 comparisons.
 
-## 16. What Was Deliberately Not Built
+## 17. What Was Deliberately Not Built
 * No heavy web dashboard/UI.
 * No per-agent blame leaderboard.
 * No raw-ticket LLM analysis.
@@ -149,6 +166,6 @@ The 30-ticket manual sample does NOT prove zero errors across the entire dataset
 
 These choices were made to keep the tool simple, local, privacy-conscious, and focused on the business question.
 
-## 17. Submission Links
+## 18. Submission Links
 * GitHub: [https://github.com/Silverfang180/internship-project](https://github.com/Silverfang180/internship-project)
 * Screen Recording: [https://drive.google.com/file/d/12sgjrtqEGZm6rlUYiOtAII8_-mqlDRgQ/view?usp=sharing](https://drive.google.com/file/d/12sgjrtqEGZm6rlUYiOtAII8_-mqlDRgQ/view?usp=sharing)
