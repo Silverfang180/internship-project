@@ -82,7 +82,7 @@ To stop the AI from hallucinating math, Python computes all the authoritative nu
 
 Early on, the AI kept trying to invent numbers in its prose, which I caught during testing. I fixed this by adding a strict rule in Python to block it from outputting digits entirely. I also threw away early ideas to build heavy web dashboards or do raw-ticket LLM analysis because keeping it simple, private, and local was better.
 
-- Recording link: [ENTER PUBLIC GOOGLE DRIVE / VIDEO URL]
+- Recording link: https://drive.google.com/file/d/12sgjrtqEGZm6rlUYiOtAII8_-mqlDRgQ/view?usp=sharing
 
 ## 9. Someone picks this up on Monday and you are unreachable: the three things they need to know
 Include exactly three: (1) how to run it, (2) the key finding and the main assumption, (3) the biggest known problem or next step.
@@ -95,11 +95,11 @@ Include exactly three: (1) how to run it, (2) the key finding and the main assum
 ## 10. Honest hours spent (one number)
 Add up logs/HOURS_LOG.md. Give a single number, including time spent reading and fixing AI output.
 - FINAL ANSWER:
-[ENTER ACTUAL HOURS]
+8
 
 ## Links
-- Public Google Drive link (memo, video, any extra files; check that it opens in a private window): [ENTER PUBLIC GOOGLE DRIVE / VIDEO URL]
-- Public GitHub repo URL (check that it opens logged out, README runs from a fresh clone, no API keys committed): [ENTER PUBLIC GITHUB REPO URL]
+- Public Google Drive link (memo, video, any extra files; check that it opens in a private window): https://drive.google.com/file/d/12sgjrtqEGZm6rlUYiOtAII8_-mqlDRgQ/view?usp=sharing
+- Public GitHub repo URL (check that it opens logged out, README runs from a fresh clone, no API keys committed): https://github.com/Silverfang180/internship-project
 
 ---
 ## Final checklist before submitting
