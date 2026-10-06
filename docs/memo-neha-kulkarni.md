@@ -26,7 +26,7 @@ Every SLA breach costs the business Rs. 350 in store credit.
 **Business Goal Scenario:**
 I aim to reduce the post-July first-response SLA breach rate from 24.9% to 15% or lower over a four-week pilot.
 
-If this reduction is achieved, it provides a scenario savings of approximately â‚¹25,848/month, or roughly Rs. 77,544/quarter. *Please note: These figures are a scenario, not a guaranteed forecast, as actual savings depend on the real volume and pilot effect.*
+If this reduction is achieved, it provides a scenario savings of approximately Rs. 25,848/month, or roughly Rs. 77,544/quarter. *Please note: These figures are a scenario, not a guaranteed forecast, as actual savings depend on the real volume and pilot effect.*
 
 ## Limitations and Uncertainty
 Before proceeding, the following limitations must be acknowledged:
