@@ -15,18 +15,18 @@ The analysis yielded several verified findings:
 - **Historical Context:** The historical breach rate was about 21.8%.
 - **Post-July Impact:** The post-July breach rate rose to 24.9% (2,229 breaches / 8,934 tickets).
 - **The Night Shift Pattern:** Night-created tickets contain the largest concentration of post-July breaches. Night coverage was zero after June 30, 2025.
-- **Demo Week (June 22-28, 2026):** In this verified week, there were 207 tickets and 49 breaches ( 23.7% rate, representing 17,150). Specifically, Night Chat had a 100% breach rate (23/23) and Night Email had a 60% breach rate (12/20).
+- **Demo Week (June 22-28, 2026):** In this verified week, there were 207 tickets and 49 breaches ( 23.7% rate, representing Rs. 17,150). Specifically, Night Chat had a 100% breach rate (23/23) and Night Email had a 60% breach rate (12/20).
 - **Transfers:** Transfers between teams were not a major differentiator.
 
 ## Financial Impact
-Every SLA breach costs the business â‚¹350 in store credit.
-- The post-July exposure is approximately â‚¹65,012/month.
-- A simple business fact: Avoiding 100 SLA breaches avoids â‚¹35,000 in store-credit exposure.
+Every SLA breach costs the business Rs. 350 in store credit.
+- The post-July exposure is approximately Rs. 65,012/month.
+- A simple business fact: Avoiding 100 SLA breaches avoids Rs. 35,000 in store-credit exposure.
 
 **Business Goal Scenario:**
 I aim to reduce the post-July first-response SLA breach rate from 24.9% to 15% or lower over a four-week pilot.
 
-If this reduction is achieved, it provides a scenario savings of approximately â‚¹25,848/month, or roughly â‚¹77,544/quarter. *Please note: These figures are a scenario, not a guaranteed forecast, as actual savings depend on the real volume and pilot effect.*
+If this reduction is achieved, it provides a scenario savings of approximately â‚¹25,848/month, or roughly Rs. 77,544/quarter. *Please note: These figures are a scenario, not a guaranteed forecast, as actual savings depend on the real volume and pilot effect.*
 
 ## Limitations and Uncertainty
 Before proceeding, the following limitations must be acknowledged:
