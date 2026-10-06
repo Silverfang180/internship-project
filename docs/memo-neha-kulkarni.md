@@ -15,7 +15,7 @@ The analysis yielded several verified findings:
 - **Historical Context:** The historical breach rate was about 21.8%.
 - **Post-July Impact:** The post-July breach rate rose to 24.9% (2,229 breaches / 8,934 tickets).
 - **The Night Shift Pattern:** Night-created tickets contain the largest concentration of post-July breaches. Night coverage was zero after June 30, 2025.
-- **Demo Week (June 22â€“28, 2026):** In this verified week, there were 207 tickets and 49 breaches (a 23.7% rate, representing â‚¹17,150). Specifically, Night Chat had a 100% breach rate (23/23) and Night Email had a 60% breach rate (12/20).
+- **Demo Week (June 22-28, 2026):** In this verified week, there were 207 tickets and 49 breaches (a 23.7% rate, representing â‚¹17,150). Specifically, Night Chat had a 100% breach rate (23/23) and Night Email had a 60% breach rate (12/20).
 - **Transfers:** Transfers between teams were not a major differentiator.
 
 ## Financial Impact
